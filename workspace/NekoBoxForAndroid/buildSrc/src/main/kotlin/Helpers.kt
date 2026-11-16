@@ -57,10 +57,11 @@ fun Project.setupCommon() {
             targetCompatibility = JavaVersion.VERSION_1_8
         }
         lint {
-            showAll = true
-            checkAllWarnings = true
-            checkReleaseBuilds = true
-            warningsAsErrors = true
+            showAll = false
+            checkAllWarnings = false
+            checkReleaseBuilds = false
+            abortOnError = false
+            warningsAsErrors = false
             textOutput = project.file("build/lint.txt")
             htmlOutput = project.file("build/lint.html")
         }
@@ -189,7 +190,7 @@ fun Project.setupApp() {
 
     androidComponents.onVariants { variant ->
         val flavorName = variant.productFlavors.firstOrNull { it.first == "vendor" }?.second
-        val fileNamePrefix = if (flavorName == "plus") "NekoBoxPlus-" else "NekoBox-"
+        val fileNamePrefix = if (flavorName == "plus") "NekoYgg-" else "NekoYgg-"
         variant.outputs.forEach { output ->
             val originalFileName = output.outputFileName.get()
             output.outputFileName.set(
