@@ -14,6 +14,76 @@ if [ -z "$GOPATH" ]; then
 	GOPATH=$(go env GOPATH)
 fi
 
+# --- Wire up custom yggdrasil-go with Android VPN socket protection ---
+YGG_DIR="../../yggdrasil-go"
+if [ -d "$YGG_DIR/src/core" ]; then
+	if grep -q "func (l \*linkTCP) dialerFor(" "$YGG_DIR/src/core/link_tcp.go"; then
+		sed -i 's/func (l \*linkTCP) dialerFor(/func (l *linkTCP) origDialerFor(/' "$YGG_DIR/src/core/link_tcp.go"
+	fi
+
+	cat > "$YGG_DIR/src/core/singbox_hook.go" << 'EOF'
+package core
+
+import (
+	"context"
+	"net"
+	"syscall"
+)
+
+func (c *Core) SetSocketControl(fn func(network, address string, rawConn syscall.RawConn) error) {
+	c.socketControl = fn
+}
+
+func (c *Core) SetCustomDialContext(fn func(ctx context.Context, network, address string) (net.Conn, error)) {
+	c.customDialContext = fn
+}
+
+func (l *linkTCP) dialerFor(dst *net.TCPAddr, sintf string) (*net.Dialer, error) {
+	d, err := l.origDialerFor(dst, sintf)
+	if err != nil {
+		return nil, err
+	}
+	if l.links != nil && l.links.core != nil && l.links.core.socketControl != nil {
+		orig := d.Control
+		ctrl := l.links.core.socketControl
+		d.Control = func(network, address string, c syscall.RawConn) error {
+			if orig != nil {
+				if err := orig(network, address, c); err != nil {
+					return err
+				}
+			}
+			return ctrl(network, address, c)
+		}
+	}
+	return d, nil
+}
+EOF
+
+	if ! grep -q "socketControl" "$YGG_DIR/src/core/core.go"; then
+		sed -i 's/outboundAllowed sync.Map/outboundAllowed sync.Map\n\tsocketControl func(network, address string, c syscall.RawConn) error\n\tcustomDialContext func(ctx context.Context, network, address string) (net.Conn, error)/' "$YGG_DIR/src/core/core.go"
+		sed -i 's/"sync"/"sync"\n\t"syscall"/' "$YGG_DIR/src/core/core.go"
+	fi
+fi
+
+if ! grep -q "github.com/yggdrasil-network/yggdrasil-go" ../../sing-box/go.mod; then
+	echo "" >> ../../sing-box/go.mod
+	echo "require github.com/yggdrasil-network/yggdrasil-go v0.5.15" >> ../../sing-box/go.mod
+	echo "replace github.com/yggdrasil-network/yggdrasil-go => ../yggdrasil-go" >> ../../sing-box/go.mod
+fi
+
+if ! grep -q "github.com/yggdrasil-network/yggdrasil-go" ./go.mod; then
+	echo "" >> ./go.mod
+	echo "require github.com/yggdrasil-network/yggdrasil-go v0.5.15" >> ./go.mod
+	echo "replace github.com/yggdrasil-network/yggdrasil-go => ../../yggdrasil-go" >> ./go.mod
+fi
+
+pushd ../../sing-box >/dev/null
+go mod tidy
+popd >/dev/null
+
+go mod tidy
+# ----------------------------------------------------------------------
+
 # Verify gVisor workaround.
 if ! go run -tags=with_gvisor ../../sing-box/cmd/internal/gvisor_workaround_verify/main.go; then
 	echo "ERROR: gVisor workaround verification failed"
@@ -53,18 +123,8 @@ build_adblock_assets() {
 
 build_adblock_assets
 
-# The privileged broker is a PIE executable packaged/extracted as a native
-# library, so modern Android's writable-directory execution restrictions apply.
 bash ../buildScript/lib/tproxy.sh || exit 1
 
-# Resolve bundled-module versions from their sibling git repos and inject them
-# via linker flags. Sibling repos live two levels up from libcore/ (the same
-# relative path under both the local and the Docker build layouts).
-#
-#   tag at HEAD  -> use the tag name
-#   else         -> use the short commit hash
-#   neither      -> leave the default (no -X flag)
-# MasterDnsVPN always uses the latest local tag, never a commit.
 resolve_version() {
 	local dir="$1" mode="${2:-}" version=""
 	[ -d "$dir" ] || return 0
@@ -85,7 +145,7 @@ VERSION_MASTERDNSVPN="v2026.06.13.234407-7de2476"
 VERSION_ADBLOCK_RUST="$(resolve_version ../../adblock-rust)"
 VERSION_ADBLOCK_RESOURCES="$(resolve_version ../../adblock-resources)"
 VERSION_UBLOCK="$(resolve_version ../../uBlock)"
-VERSION_SING_BOX="1.14.3-7054cac51"
+VERSION_SING_BOX="1.14.3-nekoygg"
 
 VERSION_LDFLAGS=""
 append_version_ldflag() {
@@ -101,7 +161,6 @@ append_version_ldflag VersionUBlock "$VERSION_UBLOCK"
 [ -n "$VERSION_SING_BOX" ] && VERSION_LDFLAGS="${VERSION_LDFLAGS} -X github.com/sagernet/sing-box/constant.Version=${VERSION_SING_BOX}"
 
 echo ">> core version: sing-box-plus=${VERSION_SING_BOX:-?}"
-echo ">> module versions: amneziawg-go=${VERSION_AMNEZIA:-?} byedpi=${VERSION_BYEDPI:-?} masterdnsvpn=${VERSION_MASTERDNSVPN:-?} adblock-rust=${VERSION_ADBLOCK_RUST:-?} adblock-resources=${VERSION_ADBLOCK_RESOURCES:-?} uBlock=${VERSION_UBLOCK:-?}"
 
 gomobile bind -v -androidapi 23 -trimpath -ldflags="-s -w -checklinkname=0${VERSION_LDFLAGS}" -tags='with_conntrack,with_gvisor,with_quic,with_wireguard,with_awg,with_tailscale,with_openvpn,with_openconnect,with_utls,with_clash_api,with_naive_outbound,with_trusttunnel_cronet,with_adblock,with_adblock_cronet,with_grpc,http2legacy,badlinkname,tfogo_checklinkname0' . || exit 1
 rm -r libcore-sources.jar
