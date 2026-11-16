@@ -27,15 +27,8 @@ EOF
 	esac
 done
 
-# Run from the repository root, or from anywhere inside it.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-
-if false; then
-	:
-else
-	PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-fi
-
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
@@ -56,7 +49,6 @@ export ANDROID_NDK_ROOT="$ANDROID_NDK_HOME"
 : "${GOPATH:=$HOME/go}"
 export GOPATH
 
-# Keep the same env resolution as the non-Docker scripts.
 # shellcheck disable=SC1091
 source "buildScript/init/env.sh"
 if [ -f "buildScript/lib/core/get_source_env.sh" ]; then
@@ -73,7 +65,6 @@ IMAGE_NAME="${PATCHED_GO_ANDROID_IMAGE:-neko-android-aar-go:${GO_VERSION}-runtim
 ANDROID_HOME_HOST="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 ANDROID_NDK_HOME_HOST="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-${NDK_HOME:-}}}"
 
-# Common Android SDK locations on Linux/macOS if env is not exported.
 if [ -z "$ANDROID_HOME_HOST" ]; then
 	for candidate in "$HOME/Android/Sdk" "$HOME/Library/Android/sdk" "/opt/android-sdk"; do
 		if [ -d "$candidate" ]; then
@@ -88,24 +79,22 @@ if [ -z "$ANDROID_HOME_HOST" ] || [ ! -d "$ANDROID_HOME_HOST" ]; then
 	exit 1
 fi
 
-# Resolve NDK from explicit env first, then from $ANDROID_HOME/ndk/<latest>.
 if [ -z "$ANDROID_NDK_HOME_HOST" ] && [ -d "$ANDROID_HOME_HOST/ndk" ]; then
 	ANDROID_NDK_HOME_HOST="$(find "$ANDROID_HOME_HOST/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1 || true)"
 fi
 
 if [ -z "$ANDROID_NDK_HOME_HOST" ] || [ ! -d "$ANDROID_NDK_HOME_HOST" ]; then
 	echo "ANDROID_NDK_HOME, ANDROID_NDK_ROOT, or NDK_HOME must point to an existing Android NDK directory" >&2
-	echo "Alternatively install an NDK under: $ANDROID_HOME_HOST/ndk/<version>" >&2
 	exit 1
 fi
 
-# Existing scripts expect sing-box/libneko as siblings of the project root.
 WORKSPACE_HOST="$(cd "$PROJECT_ROOT/.." && pwd)"
 SING_BOX_HOST="${SING_BOX_SRC:-$WORKSPACE_HOST/sing-box}"
 SING_VMESS_HOST="${SING_VMESS_SRC:-$WORKSPACE_HOST/sing-vmess}"
 X_NET_HOST="${X_NET_SRC:-$WORKSPACE_HOST/net}"
 LIBNEKO_HOST="${LIBNEKO_SRC:-$WORKSPACE_HOST/libneko}"
 AMNEZIAWG_GO_HOST="${AMNEZIAWG_GO_SRC:-$WORKSPACE_HOST/amneziawg-go}"
+YGGDRASIL_GO_HOST="${YGGDRASIL_GO_SRC:-$WORKSPACE_HOST/yggdrasil-go}"
 MASTERDNSVPN_HOST="${MASTERDNSVPN_SRC:-$WORKSPACE_HOST/MasterDnsVPN-plus}"
 BYEDPI_HOST="${BYEDPI_SRC:-$WORKSPACE_HOST/byedpi}"
 ADBLOCK_RESOURCES_HOST="${ADBLOCK_RESOURCES_SRC:-$WORKSPACE_HOST/adblock-resources}"
@@ -160,7 +149,6 @@ DOCKER_ARGS=(
 	-w /workspace/project
 )
 
-# Mount source siblings when present. If absent, init.sh/get_source.sh can still clone them.
 if [ -d "$SING_BOX_HOST" ]; then
 	DOCKER_ARGS+=(-v "$SING_BOX_HOST:/workspace/sing-box")
 fi
@@ -175,6 +163,9 @@ if [ -d "$LIBNEKO_HOST" ]; then
 fi
 if [ -d "$AMNEZIAWG_GO_HOST" ]; then
 	DOCKER_ARGS+=(-v "$AMNEZIAWG_GO_HOST:/workspace/amneziawg-go")
+fi
+if [ -d "$YGGDRASIL_GO_HOST" ]; then
+	DOCKER_ARGS+=(-v "$YGGDRASIL_GO_HOST:/workspace/yggdrasil-go")
 fi
 if [ -d "$MASTERDNSVPN_HOST" ]; then
 	DOCKER_ARGS+=(-v "$MASTERDNSVPN_HOST:/workspace/MasterDnsVPN-plus")
@@ -195,12 +186,10 @@ if [ -d "$UTLS_HOST" ]; then
 	DOCKER_ARGS+=(-v "$UTLS_HOST:/workspace/utls")
 fi
 
-# Preserve SSH agent for git@github.com clones used by get_source.sh.
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
 	DOCKER_ARGS+=(-e SSH_AUTH_SOCK=/ssh-agent -v "$SSH_AUTH_SOCK:/ssh-agent")
 fi
 
-# Allow any extra docker flags without editing this script, e.g. DOCKER_RUN_EXTRA_ARGS='--network host'.
 if [ -n "${DOCKER_RUN_EXTRA_ARGS:-}" ]; then
 	# shellcheck disable=SC2206
 	EXTRA_ARGS=(${DOCKER_RUN_EXTRA_ARGS})
@@ -211,17 +200,7 @@ docker run --network host "${DOCKER_ARGS[@]}" "$IMAGE_NAME" bash -c '
   set -euo pipefail
   go version
   git config --global http.version HTTP/1.1
-  git config --global --add safe.directory /workspace/project
-  git config --global --add safe.directory /workspace/sing-box
-  git config --global --add safe.directory /workspace/sing-vmess
-  git config --global --add safe.directory /workspace/libneko
-  git config --global --add safe.directory /workspace/amneziawg-go
-  git config --global --add safe.directory /workspace/MasterDnsVPN-plus
-  git config --global --add safe.directory /workspace/byedpi
-  git config --global --add safe.directory /workspace/adblock-resources
-  git config --global --add safe.directory /workspace/adblock-rust
-  git config --global --add safe.directory /workspace/uBlock
-  git config --global --add safe.directory /workspace/utls
+  git config --global --add safe.directory "*"
   bash buildScript/lib/core.sh
   mkdir -p /out
   find /workspace/project /workspace/sing-box /workspace/sing-vmess /workspace/libneko /workspace/byedpi /workspace/utls -type f -name "*.aar" -exec cp -v {} /out/ \; 2>/dev/null || true
