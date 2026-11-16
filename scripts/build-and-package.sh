@@ -1,46 +1,42 @@
 #!/usr/bin/env bash
-# Builds NekoBox+ from an already-patched ./workspace (see
-# prepare-workspace.sh) and collects the release APKs into ./dist.
-#
-# Must run where ANDROID_HOME is set to an installed SDK with an NDK
-# under $ANDROID_HOME/ndk/<version>, and Docker available -- the patch
-# requires the containerised core build (buildScript/lib/core.docker.sh),
-# since it bundles a Go runtime carrying this project's own runtime
-# patches. That container build auto-mounts every workspace/<dep> sibling
-# we already prepared (its own defaults point at exactly that layout),
-# so no extra wiring is needed here beyond running it from the right cwd.
-
 set -euo pipefail
 
 ROOT="$(pwd)"
 NBA="$ROOT/workspace/NekoBoxForAndroid"
+
+# --- clone custom yggdrasil-go into workspace/yggdrasil-go -----------
+if [ ! -d "$ROOT/workspace/yggdrasil-go" ]; then
+  echo "Cloning lespromtehkms/yggdrasil-go..."
+  git clone --depth 1 -b develop https://github.com/lespromtehkms/yggdrasil-go.git "$ROOT/workspace/yggdrasil-go" || \
+  git clone --depth 1 https://github.com/lespromtehkms/yggdrasil-go.git "$ROOT/workspace/yggdrasil-go"
+fi
+
 cd "$NBA"
 
 # --- signing ---------------------------------------------------------
-# app/build.gradle.kts signs from rootProject.file("release.keystore")
-# using KEYSTORE_PASS/ALIAS_NAME/ALIAS_PASS (env or local.properties).
-# The upstream repo ships its own release.keystore, but we don't have
-# its password, so provide your own via the KEYSTORE_BASE64 secret --
-# see the setup note in the PR/README for the one-time keytool command.
 if [ -n "${KEYSTORE_BASE64:-}" ]; then
   echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
   echo "using the provided KEYSTORE_BASE64 keystore"
 else
-  echo "WARNING: KEYSTORE_BASE64 not set; falling back to whatever" \
-       "release.keystore came from the upstream checkout, which will" \
-       "only work if KEYSTORE_PASS/ALIAS_NAME/ALIAS_PASS also match it." >&2
+  echo "Generating self-signed release.keystore for NekoYgg..."
+  rm -f release.keystore
+  keytool -genkeypair -v \
+    -keystore release.keystore \
+    -alias nekoygg \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 10000 \
+    -storepass nekoygg123 \
+    -keypass nekoygg123 \
+    -dname "CN=NekoYgg, OU=Dev, O=NekoYgg, L=Unknown, ST=Unknown, C=US"
+  export KEYSTORE_PASS="nekoygg123"
+  export ALIAS_NAME="nekoygg"
+  export ALIAS_PASS="nekoygg123"
 fi
 
-# --- native core (Docker; required -- see comment above) --------------
+# --- native core (Docker) --------------------------------------------
 bash buildScript/lib/assets.sh
 
-# sing-box's adblock-rust bridge (common/adblock/adblockrust/resources/embed.go)
-# go:embeds resources/files/placeholder.txt. Without adblock-resources/uBlock
-# wired in as siblings for sing-box's own `make -f Makefile.plus
-# adblock-resources-generate` (we don't clone those -- no source URL for them
-# anywhere in patches.tar.gz), that file never gets created and the Go build
-# fails outright. Touching it here keeps the build going with an empty
-# ad-block ruleset; ask if you want the real uBlock filter lists wired in too.
 mkdir -p "$ROOT/workspace/sing-box/common/adblock/adblockrust/resources/files"
 touch "$ROOT/workspace/sing-box/common/adblock/adblockrust/resources/files/placeholder.txt"
 
@@ -53,11 +49,11 @@ NDK_DIR="${ANDROID_NDK_HOME:-$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 
 {
   echo "sdk.dir=${ANDROID_HOME}"
   echo "ndk.dir=${NDK_DIR}"
+  echo "KEYSTORE_PASS=${KEYSTORE_PASS:-nekoygg123}"
+  echo "ALIAS_NAME=${ALIAS_NAME:-nekoygg}"
+  echo "ALIAS_PASS=${ALIAS_PASS:-nekoygg123}"
 } > local.properties
 
-# "plus" is the flavor this patch set adds; its own output-naming rule
-# already produces NekoBoxPlus-<version>-<abi>.apk / -universal.apk, so
-# nothing here needs to rename anything.
 ./gradlew app:assemblePlusRelease --stacktrace
 
 # --- collect + report version ------------------------------------------
