@@ -26,6 +26,7 @@ import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean
 import io.nekohasekai.sagernet.fmt.shadowsocksr.toUri
 import io.nekohasekai.sagernet.fmt.snell.SnellBean
 import io.nekohasekai.sagernet.fmt.tailscale.TailscaleBean
+import io.nekohasekai.sagernet.fmt.yggdrasil.YggdrasilBean
 import io.nekohasekai.sagernet.fmt.snell.toUri
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -108,6 +109,7 @@ data class ProxyEntity(
     var tailscaleBean: TailscaleBean? = null,
     var openVPNBean: OpenVPNBean? = null,
     var openConnectBean: OpenConnectBean? = null,
+    var yggdrasilBean: YggdrasilBean? = null,
     var proxySetBean: ProxySetBean? = null,
     var chainBean: ChainBean? = null,
     var nekoBean: NekoBean? = null,
@@ -144,6 +146,7 @@ data class ProxyEntity(
         const val TYPE_TAILSCALE = 32
         const val TYPE_OPENVPN = 33
         const val TYPE_OPENCONNECT = 34
+        const val TYPE_YGGDRASIL = 35
 
         const val TYPE_CONFIG = 998
         const val TYPE_NEKO = 999
@@ -246,6 +249,7 @@ data class ProxyEntity(
             TYPE_TAILSCALE -> tailscaleBean = KryoConverters.tailscaleDeserialize(byteArray)
             TYPE_OPENVPN -> openVPNBean = KryoConverters.openVPNDeserialize(byteArray)
             TYPE_OPENCONNECT -> openConnectBean = KryoConverters.openConnectDeserialize(byteArray)
+            TYPE_YGGDRASIL -> yggdrasilBean = KryoConverters.yggdrasilDeserialize(byteArray)
             TYPE_PROXY_SET -> proxySetBean = KryoConverters.proxySetDeserialize(byteArray)
             TYPE_CHAIN -> chainBean = KryoConverters.chainDeserialize(byteArray)
             TYPE_NEKO -> nekoBean = KryoConverters.nekoDeserialize(byteArray)
@@ -280,6 +284,7 @@ data class ProxyEntity(
         TYPE_TAILSCALE -> "Tailscale"
         TYPE_OPENVPN -> "OpenVPN"
         TYPE_OPENCONNECT -> "OpenConnect"
+        TYPE_YGGDRASIL -> "Yggdrasil"
         TYPE_PROXY_SET -> proxySetBean!!.displayType()
         TYPE_CHAIN -> chainName
         TYPE_NEKO -> nekoBean!!.displayType()
@@ -318,6 +323,7 @@ data class ProxyEntity(
             TYPE_TAILSCALE -> tailscaleBean
             TYPE_OPENVPN -> openVPNBean
             TYPE_OPENCONNECT -> openConnectBean
+            TYPE_YGGDRASIL -> yggdrasilBean
             TYPE_PROXY_SET -> proxySetBean
             TYPE_CHAIN -> chainBean
             TYPE_NEKO -> nekoBean
@@ -347,6 +353,7 @@ data class ProxyEntity(
             is TailscaleBean -> false
             is OpenVPNBean -> false
             is OpenConnectBean -> false
+            is YggdrasilBean -> false
             is ProxySetBean -> false
             is ChainBean -> false
             is ByeDPIBean -> false
@@ -385,7 +392,7 @@ data class ProxyEntity(
     }
 
     fun usesUniversalLinkForGroupExport(): Boolean = when (requireBean()) {
-        is TailscaleBean, is OpenVPNBean, is OpenConnectBean -> true
+        is TailscaleBean, is OpenVPNBean, is OpenConnectBean, is YggdrasilBean -> true
         else -> false
     }
 
@@ -468,7 +475,6 @@ data class ProxyEntity(
                     3 -> "mux.cool"
                     else -> "h2mux"
                 }
-                // muxMode 0: max_streams mode, 1: connections mode
                 if (vmessBean!!.muxMode == 1) {
                     max_connections = vmessBean!!.muxMaxConnections
                     min_streams = vmessBean!!.muxMinStreams
@@ -493,7 +499,6 @@ data class ProxyEntity(
                     3 -> "mux.cool"
                     else -> "h2mux"
                 }
-                // muxMode 0: max_streams mode, 1: connections mode
                 if (trojanBean!!.muxMode == 1) {
                     max_connections = trojanBean!!.muxMaxConnections
                     min_streams = trojanBean!!.muxMinStreams
@@ -518,7 +523,6 @@ data class ProxyEntity(
                     3 -> "mux.cool"
                     else -> "h2mux"
                 }
-                // muxMode 0: max_streams mode, 1: connections mode
                 if (ssBean!!.muxMode == 1) {
                     max_connections = ssBean!!.muxMaxConnections
                     min_streams = ssBean!!.muxMinStreams
@@ -565,6 +569,7 @@ data class ProxyEntity(
         tailscaleBean = null
         openVPNBean = null
         openConnectBean = null
+        yggdrasilBean = null
         proxySetBean = null
         chainBean = null
         configBean = null
@@ -701,6 +706,11 @@ data class ProxyEntity(
                 openConnectBean = bean
             }
 
+            is YggdrasilBean -> {
+                type = TYPE_YGGDRASIL
+                yggdrasilBean = bean
+            }
+
             is ProxySetBean -> {
                 type = TYPE_PROXY_SET
                 proxySetBean = bean
@@ -755,6 +765,7 @@ data class ProxyEntity(
                 TYPE_TAILSCALE -> TailscaleSettingsActivity::class.java
                 TYPE_OPENVPN -> OpenVPNSettingsActivity::class.java
                 TYPE_OPENCONNECT -> OpenConnectSettingsActivity::class.java
+                TYPE_YGGDRASIL -> YggdrasilSettingsActivity::class.java
                 TYPE_PROXY_SET -> ProxySetSettingsActivity::class.java
                 TYPE_CHAIN -> ChainSettingsActivity::class.java
                 TYPE_CONFIG -> ConfigSettingActivity::class.java
