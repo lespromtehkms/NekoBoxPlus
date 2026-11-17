@@ -16,11 +16,13 @@ import (
 
 	"github.com/matsuridayo/libneko/neko_log"
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/adapter/endpoint"
 	"github.com/sagernet/sing-box/boxapi"
 	"github.com/sagernet/sing-box/common/trafficcontrol"
 	adblockRegexpr "github.com/sagernet/sing-box/experimental/adblock/regexpr"
 	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/protocol/group"
+	"github.com/sagernet/sing-box/protocol/yggdrasil"
 
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/constant"
@@ -31,6 +33,12 @@ import (
 )
 
 var mainInstance *BoxInstance
+
+func nekoboxAndroidEndpointRegistryWithYgg() *endpoint.Registry {
+	registry := nekoboxAndroidEndpointRegistry()
+	yggdrasil.RegisterEndpoint(registry)
+	return registry
+}
 
 func VersionBox() string {
 	version := []string{
@@ -200,7 +208,7 @@ func newSingBoxInstanceWithRoutingPathsContext(
 	// create box context
 	ctx, cancel := context.WithCancel(parentCtx)
 	ctx = box.Context(ctx,
-		nekoboxAndroidInboundRegistry(), nekoboxAndroidOutboundRegistry(), nekoboxAndroidEndpointRegistry(),
+		nekoboxAndroidInboundRegistry(), nekoboxAndroidOutboundRegistry(), nekoboxAndroidEndpointRegistryWithYgg(),
 		nekoboxAndroidDNSTransportRegistry(localTransport), nekoboxAndroidServiceRegistry(),
 		nekoboxAndroidCertificateProviderRegistry(),
 	)
