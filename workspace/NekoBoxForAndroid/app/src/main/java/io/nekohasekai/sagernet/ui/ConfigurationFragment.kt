@@ -140,6 +140,7 @@ import io.nekohasekai.sagernet.ui.profile.SnellSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TrojanGoSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TrojanSettingsActivity
+import io.nekohasekai.sagernet.ui.profile.YggdrasilSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TailscaleSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TrustTunnelSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity
@@ -1231,6 +1232,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_new_tailscale -> {
                 startActivity(Intent(requireActivity(), TailscaleSettingsActivity::class.java))
+            }
+
+            R.id.action_new_yggdrasil -> {
+             startActivity(Intent(requireActivity(), YggdrasilSettingsActivity::class.java))
             }
 
             R.id.action_new_openvpn -> {
