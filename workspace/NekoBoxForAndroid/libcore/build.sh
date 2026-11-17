@@ -165,6 +165,29 @@ echo ">> core version: sing-box-plus=${VERSION_SING_BOX:-?}"
 gomobile bind -v -androidapi 23 -trimpath -ldflags="-s -w -checklinkname=0${VERSION_LDFLAGS}" -tags='with_conntrack,with_gvisor,with_quic,with_wireguard,with_awg,with_tailscale,with_openvpn,with_openconnect,with_utls,with_clash_api,with_naive_outbound,with_trusttunnel_cronet,with_adblock,with_adblock_cronet,with_grpc,http2legacy,badlinkname,tfogo_checklinkname0' . || exit 1
 rm -r libcore-sources.jar
 
+# --- Rebrand UI strings from NekoBox+ to NekoYgg ---
+find ../app/src/main/res -name "strings.xml" -exec sed -i \
+	-e 's|<string name="app_name"\([^>]*\)>NekoBox+</string>|<string name="app_name"\1>NekoYgg</string>|g' \
+	-e 's|<string name="app_name"\([^>]*\)>NekoBox</string>|<string name="app_name"\1>NekoYgg</string>|g' \
+	-e 's|NekoBox+ для Android|NekoYgg (форк NekoBox+ для Android)|g' \
+	-e 's|NekoBox для Android|NekoYgg (форк NekoBox+ для Android)|g' \
+	-e 's|NekoBox+ for Android|NekoYgg (fork of NekoBox+ for Android)|g' \
+	-e 's|NekoBox for Android|NekoYgg (fork of NekoBox+ for Android)|g' \
+	{} +
+
+find ../app/src/main/res/layout -name "*.xml" -exec sed -i \
+	-e 's|NekoBox+ для Android|NekoYgg (форк NekoBox+ для Android)|g' \
+	-e 's|NekoBox+ for Android|NekoYgg (fork of NekoBox+ for Android)|g' \
+	-e 's|"NekoBox+"|"NekoYgg"|g' \
+	{} + 2>/dev/null || true
+
+find ../app/src/main/java -name "*.kt" -exec sed -i \
+	-e 's|"NekoBox+ для Android"|"NekoYgg (форк NekoBox+ для Android)"|g' \
+	-e 's|"NekoBox+ for Android"|"NekoYgg (fork of NekoBox+ for Android)"|g' \
+	-e 's|"NekoBox+"|"NekoYgg"|g' \
+	{} + 2>/dev/null || true
+# ---------------------------------------------------
+
 proj=../app/libs
 mkdir -p $proj
 cp -f libcore.aar $proj
