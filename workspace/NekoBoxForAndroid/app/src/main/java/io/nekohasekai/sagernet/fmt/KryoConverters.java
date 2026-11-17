@@ -22,6 +22,7 @@ import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean;
 import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean;
 import io.nekohasekai.sagernet.fmt.snell.SnellBean;
 import io.nekohasekai.sagernet.fmt.tailscale.TailscaleBean;
+import io.nekohasekai.sagernet.fmt.yggdrasil.YggdrasilBean;
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean;
 import moe.matsuri.nb4a.proxy.byedpi.ByeDPIBean;
 import moe.matsuri.nb4a.proxy.direct.DirectBean;
@@ -214,6 +215,12 @@ public class KryoConverters {
     }
 
     @TypeConverter
+    public static YggdrasilBean yggdrasilDeserialize(byte[] bytes) {
+        if (JavaUtil.isEmpty(bytes)) return null;
+        return deserialize(new YggdrasilBean(), bytes);
+    }
+
+    @TypeConverter
     public static OpenVPNBean openVPNDeserialize(byte[] bytes) {
         if (JavaUtil.isEmpty(bytes)) return null;
         return deserialize(new OpenVPNBean(), bytes);
@@ -230,7 +237,6 @@ public class KryoConverters {
         if (JavaUtil.isEmpty(bytes)) return null;
         return deserialize(new DirectBean(), bytes);
     }
-
 
     @TypeConverter
     public static ChainBean chainDeserialize(byte[] bytes) {
