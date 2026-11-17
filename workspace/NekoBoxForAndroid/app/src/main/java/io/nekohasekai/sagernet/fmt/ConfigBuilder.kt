@@ -42,6 +42,8 @@ import io.nekohasekai.sagernet.fmt.ssh.SSHBean
 import io.nekohasekai.sagernet.fmt.ssh.buildSingBoxOutboundSSHBean
 import io.nekohasekai.sagernet.fmt.tailscale.TailscaleBean
 import io.nekohasekai.sagernet.fmt.tailscale.buildSingBoxEndpointTailscaleBean
+import io.nekohasekai.sagernet.fmt.yggdrasil.YggdrasilBean
+import io.nekohasekai.sagernet.fmt.yggdrasil.buildSingBoxEndpointYggdrasilBean
 import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
 import io.nekohasekai.sagernet.fmt.trojan_go.buildSingBoxOutboundTrojanGoBean
 import io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean
@@ -355,7 +357,10 @@ fun buildConfig(
     val useFakeDns = dnsPlan.useFakeDns
     val needSniff = DataStore.trafficSniffing > 0
     val externalIndexMap = ArrayList<IndexEntity>()
-    val ipv6Mode = dnsPlan.ipv6Mode
+    val hasYggdrasil = proxy.type == ProxyEntity.TYPE_YGGDRASIL ||
+    extraProxies.values.any { it.type == ProxyEntity.TYPE_YGGDRASIL } ||
+    runCatching { profileResolver.resolveGraph(proxy, true).any { it.profile.type == ProxyEntity.TYPE_YGGDRASIL } }.getOrDefault(false)
+val ipv6Mode = if (hasYggdrasil && dnsPlan.ipv6Mode == IPv6Mode.DISABLE) IPv6Mode.ENABLE else dnsPlan.ipv6Mode
 
     return MyOptions()
         .apply {
@@ -946,6 +951,22 @@ fun buildConfig(
                                     awgEndpoint
                                 }
 
+                                 is YggdrasilBean -> {
+                                    val yggEndpoint = buildSingBoxEndpointYggdrasilBean(bean).apply {
+                                     tag = tagOut
+                                 }
+                                    currentIsEndpoint = true
+                                    endpoints!!.add(yggEndpoint)
+                                    route.rules.add(
+                                     0,
+                                     Rule_DefaultOptions().apply {
+                                         ip_cidr = listOf("0200::/7")
+                                         outbound = tagOut
+                                     },
+                                 )
+                                 yggEndpoint
+                                }
+
                                 is SSHBean -> {
                                     buildSingBoxOutboundSSHBean(bean)
                                 }
@@ -1221,11 +1242,9 @@ fun buildConfig(
 
                 route.final_ = mainProxyTag
             } else {
-                if (mainProxyIsEndpoint) {
-                    // Preserve the historical "selected profile is the implicit default" behavior
-                    // when the selected main hop is emitted as an endpoint instead of an outbound.
-                    route.final_ = mainProxyTag
-                }
+               if (mainProxyIsEndpoint) {
+                 route.final_ = if (proxy.type == ProxyEntity.TYPE_YGGDRASIL) TAG_DIRECT else mainProxyTag
+             }
 
                 val nonBypassPackages = mutableListOf<String>()
 
