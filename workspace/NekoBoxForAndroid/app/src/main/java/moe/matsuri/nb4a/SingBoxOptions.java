@@ -2999,7 +2999,15 @@ public class SingBoxOptions {
         public Integer workers;
 
     }
+     public static class YggdrasilEndpointOptions extends Outbound {
 
+        public String private_key;
+        public List<String> peers;
+        public List<String> allowed_public_keys;
+        public String group_password;
+        public Integer mtu;
+
+ }
     public static class TailscaleEndpointOptions extends Outbound {
 
         public String state_directory;
