@@ -7,7 +7,6 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import dev.matrix.roomigrant.GenerateRoomMigrations
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.app.AppGraph
@@ -25,7 +24,6 @@ import io.nekohasekai.sagernet.fmt.gson.GsonConverters
     ]
 )
 @TypeConverters(value = [KryoConverters::class, GsonConverters::class])
-@GenerateRoomMigrations
 abstract class SagerDatabase : RoomDatabase() {
 
     companion object {
@@ -278,10 +276,9 @@ abstract class SagerDatabase : RoomDatabase() {
 
         private val MIGRATION_27_28 = object : Migration(27, 28) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Both branches shipped different version-27 schemas. Fill the columns missing
-                // from either layout so upgrades from plus and plus-1.14 converge on version 28.
                 database.addColumnIfMissing("proxy_entities", "openVPNBean", "BLOB")
                 database.addColumnIfMissing("proxy_entities", "openConnectBean", "BLOB")
+                database.addColumnIfMissing("proxy_entities", "yggdrasilBean", "BLOB")
                 database.addColumnIfMissing("proxy_entities", "countryCode", "TEXT NOT NULL DEFAULT ''")
                 database.addColumnIfMissing("proxy_entities", "countrySource", "INTEGER NOT NULL DEFAULT 0")
             }
